@@ -101,8 +101,12 @@ MainWindow::MainWindow(QWidget *parent)
     resize(900, 480);
 
     auto *centralWidget = new QWidget(this);
+    centralWidget->setObjectName(QStringLiteral("mainPanel"));
     auto *mainLayout = new QVBoxLayout(centralWidget);
     auto *buttonLayout = new QHBoxLayout();
+
+    mainLayout->setContentsMargins(14, 14, 14, 14);
+    mainLayout->setSpacing(10);
 
     auto *addButton = new QPushButton(QStringLiteral("Aggiungi farmaco"), this);
     auto *editButton = new QPushButton(QStringLiteral("Modifica scheda"), this);
@@ -142,6 +146,14 @@ MainWindow::MainWindow(QWidget *parent)
     mainLayout->addWidget(m_table);
     mainLayout->addWidget(m_statusLabel);
     setCentralWidget(centralWidget);
+
+    setStyleSheet(QStringLiteral(
+        "QWidget#mainPanel {"
+        " border: 3px solid #2f7d32;"
+        " border-radius: 10px;"
+        " background-color: palette(window);"
+        "}"
+    ));
 
     connect(addButton, &QPushButton::clicked, this, &MainWindow::addMedicine);
     connect(editButton, &QPushButton::clicked, this, &MainWindow::editSelectedMedicine);
