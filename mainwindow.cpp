@@ -12,6 +12,7 @@
 #include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QCheckBox>
 #include <QSpinBox>
 #include <QTableWidget>
 #include <QTableWidgetItem>
@@ -37,25 +38,30 @@ MainWindow::MainWindow(QWidget *parent)
     auto *editButton = new QPushButton(QStringLiteral("Modifica scheda"), this);
     auto *inventoryButton = new QPushButton(QStringLiteral("Aggiorna scorte"), this);
     auto *removeButton = new QPushButton(QStringLiteral("Rimuovi"), this);
+    auto *selectedNamesButton = new QPushButton(QStringLiteral("Mostra selezionati"), this);
     auto *runNowButton = new QPushButton(QStringLiteral("Esegui controllo ora"), this);
 
-    m_table->setColumnCount(5);
+    m_table->setColumnCount(6);
     m_table->setHorizontalHeaderLabels({
         QStringLiteral("Farmaco"),
         QStringLiteral("Pastiglie/conf."),
-        QStringLiteral("Assunzione/giorno"),
-        QStringLiteral("Stato corrente"),
-        QStringLiteral("Scorta confezioni")
+        QStringLiteral("Assunzione/die"),
+        QStringLiteral("Stato corr."),
+        QStringLiteral("Scorta conf."),
+        QStringLiteral("Stand-by")
     });
     m_table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Interactive);
+    m_table->setColumnWidth(0, 260);
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
-    m_table->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_table->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
     buttonLayout->addWidget(addButton);
     buttonLayout->addWidget(editButton);
     buttonLayout->addWidget(inventoryButton);
     buttonLayout->addWidget(removeButton);
+    buttonLayout->addWidget(selectedNamesButton);
     buttonLayout->addStretch();
     buttonLayout->addWidget(runNowButton);
 
@@ -68,6 +74,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(editButton, &QPushButton::clicked, this, &MainWindow::editSelectedMedicine);
     connect(inventoryButton, &QPushButton::clicked, this, &MainWindow::updateInventory);
     connect(removeButton, &QPushButton::clicked, this, &MainWindow::removeSelectedMedicine);
+    connect(selectedNamesButton, &QPushButton::clicked, this, &MainWindow::showSelectedMedicines);
     connect(runNowButton, &QPushButton::clicked, this, &MainWindow::runDailyUpdate);
     connect(&m_store, &MedicineStore::dataChanged, this, &MainWindow::refreshTable);
     connect(&m_store, &MedicineStore::lowStockAlert, this, &MainWindow::onLowStockAlert);
@@ -95,6 +102,7 @@ void MainWindow::refreshTable()
         m_table->setItem(row, 2, new QTableWidgetItem(QString::number(medicine.dailyPills)));
         m_table->setItem(row, 3, new QTableWidgetItem(QString::number(medicine.currentPills)));
         m_table->setItem(row, 4, new QTableWidgetItem(QString::number(medicine.stockBoxes)));
+        m_table->setItem(row, 5, new QTableWidgetItem(medicine.standby ? QStringLiteral("Sì") : QStringLiteral("No")));
     }
 
     m_statusLabel->setText(QStringLiteral("Archivio JSON: %1").arg(m_store.storagePath()));
@@ -155,6 +163,27 @@ void MainWindow::removeSelectedMedicine()
     }
 }
 
+void MainWindow::showSelectedMedicines()
+{
+    const QModelIndexList rows = m_table->selectionModel()->selectedRows();
+    if (rows.isEmpty()) {
+        QMessageBox::information(this,
+                                 QStringLiteral("Farmaci selezionati"),
+                                 QStringLiteral("Seleziona uno o più farmaci dalla tabella."));
+        return;
+    }
+
+    QStringList names;
+    names.reserve(rows.size());
+    for (const QModelIndex &row : rows) {
+        names << m_store.medicines().at(row.row()).name;
+    }
+
+    QMessageBox::information(this,
+                             QStringLiteral("Farmaci selezionati"),
+                             names.join(QStringLiteral("\n")));
+}
+
 void MainWindow::scheduleNextDailyUpdate()
 {
     const QDateTime now = QDateTime::currentDateTime();
@@ -204,6 +233,7 @@ bool MainWindow::editMedicineDialog(Medicine &medicine, bool editInventory)
     auto *dailyPillsSpin = new QSpinBox(&dialog);
     auto *currentPillsSpin = new QSpinBox(&dialog);
     auto *stockBoxesSpin = new QSpinBox(&dialog);
+    auto *standbyCheck = new QCheckBox(QStringLiteral("Farmaco in stand-by"), &dialog);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
 
     pillsPerBoxSpin->setRange(1, 10000);
@@ -215,6 +245,7 @@ bool MainWindow::editMedicineDialog(Medicine &medicine, bool editInventory)
     dailyPillsSpin->setValue(qMax(0, medicine.dailyPills));
     currentPillsSpin->setValue(qMax(0, medicine.currentPills));
     stockBoxesSpin->setValue(qMax(0, medicine.stockBoxes));
+    standbyCheck->setChecked(medicine.standby);
 
     formLayout->addRow(QStringLiteral("Nome farmaco"), nameEdit);
     if (editInventory) {
@@ -223,6 +254,7 @@ bool MainWindow::editMedicineDialog(Medicine &medicine, bool editInventory)
     }
     formLayout->addRow(QStringLiteral("Stato corrente (pastiglie)"), currentPillsSpin);
     formLayout->addRow(QStringLiteral("Magazzino (confezioni)"), stockBoxesSpin);
+    formLayout->addRow(QString(), standbyCheck);
 
     layout->addLayout(formLayout);
     layout->addWidget(buttons);
@@ -247,6 +279,7 @@ bool MainWindow::editMedicineDialog(Medicine &medicine, bool editInventory)
     }
     medicine.currentPills = currentPillsSpin->value();
     medicine.stockBoxes = stockBoxesSpin->value();
+    medicine.standby = standbyCheck->isChecked();
     medicine.lowStockNotified = false;
     return true;
 }

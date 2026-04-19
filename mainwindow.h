@@ -23,6 +23,7 @@ private slots:
     void editSelectedMedicine();
     void updateInventory();
     void removeSelectedMedicine();
+    void showSelectedMedicines();
     void scheduleNextDailyUpdate();
     void runDailyUpdate();
     void onLowStockAlert(const QString &message);

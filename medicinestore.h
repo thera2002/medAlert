@@ -11,6 +11,7 @@ struct Medicine {
     int dailyPills = 0;
     int currentPills = 0;
     int stockBoxes = 0;
+    bool standby = false;
     bool lowStockNotified = false;
 };
 

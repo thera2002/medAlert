@@ -29,6 +29,7 @@ QJsonObject medicineToJson(const Medicine &medicine)
     object["dailyPills"] = medicine.dailyPills;
     object["currentPills"] = medicine.currentPills;
     object["stockBoxes"] = medicine.stockBoxes;
+    object["standby"] = medicine.standby;
     object["lowStockNotified"] = medicine.lowStockNotified;
     return object;
 }
@@ -41,6 +42,7 @@ Medicine medicineFromJson(const QJsonObject &object)
     medicine.dailyPills = object["dailyPills"].toInt();
     medicine.currentPills = object["currentPills"].toInt();
     medicine.stockBoxes = object["stockBoxes"].toInt();
+    medicine.standby = object["standby"].toBool();
     medicine.lowStockNotified = object["lowStockNotified"].toBool();
     return medicine;
 }
@@ -206,7 +208,7 @@ QString MedicineStore::buildLowStockMessage() const
 void MedicineStore::processSingleDay()
 {
     for (Medicine &medicine : m_medicines) {
-        if (medicine.dailyPills <= 0) {
+        if (medicine.standby || medicine.dailyPills <= 0) {
             continue;
         }
 
