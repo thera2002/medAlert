@@ -11,7 +11,7 @@ NotificationService::NotificationService(QObject *parent)
 {
 }
 
-bool NotificationService::sendLowStockNotification(const QString &message)
+bool NotificationService::sendNotification(const QString &title, const QString &message, const QString &iconName)
 {
     QDBusInterface notificationsInterface(
         QStringLiteral("org.freedesktop.Notifications"),
@@ -30,12 +30,19 @@ bool NotificationService::sendLowStockNotification(const QString &message)
         QStringLiteral("Notify"),
         QStringLiteral("medAlert"),
         static_cast<uint>(0),
-        QStringLiteral("dialog-warning"),
-        QStringLiteral("Scorte medicine in esaurimento"),
+        iconName,
+        title,
         message,
         QStringList(),
         hints,
         15000);
 
     return reply.type() != QDBusMessage::ErrorMessage;
+}
+
+bool NotificationService::sendLowStockNotification(const QString &message)
+{
+    return sendNotification(QStringLiteral("Scorte medicine in esaurimento"),
+                            message,
+                            QStringLiteral("dialog-warning"));
 }

@@ -29,6 +29,7 @@ QJsonObject medicineToJson(const Medicine &medicine)
     object["dailyPills"] = medicine.dailyPills;
     object["currentPills"] = medicine.currentPills;
     object["stockBoxes"] = medicine.stockBoxes;
+    object["alertThreshold"] = medicine.alertThreshold;
     object["standby"] = medicine.standby;
     object["lowStockNotified"] = medicine.lowStockNotified;
     return object;
@@ -42,6 +43,7 @@ Medicine medicineFromJson(const QJsonObject &object)
     medicine.dailyPills = object["dailyPills"].toInt();
     medicine.currentPills = object["currentPills"].toInt();
     medicine.stockBoxes = object["stockBoxes"].toInt();
+    medicine.alertThreshold = object.contains("alertThreshold") ? object["alertThreshold"].toInt() : 10;
     medicine.standby = object["standby"].toBool();
     medicine.lowStockNotified = object["lowStockNotified"].toBool();
     return medicine;
@@ -166,7 +168,7 @@ void MedicineStore::setInventory(int index, int currentPills, int stockBoxes)
     emit dataChanged();
 }
 
-QString MedicineStore::processPendingDailyUpdates()
+QString MedicineStore::processPendingDailyUpdates(bool emitNotification)
 {
     const QDate targetDate = effectiveProcessingDate(QDateTime::currentDateTime());
     if (!m_lastProcessedDate.isValid()) {
@@ -186,10 +188,15 @@ QString MedicineStore::processPendingDailyUpdates()
     emit dataChanged();
 
     const QString message = buildLowStockMessage();
-    if (!message.isEmpty()) {
+    if (emitNotification && !message.isEmpty()) {
         emit lowStockAlert(message);
     }
     return message;
+}
+
+QString MedicineStore::lowStockSummary() const
+{
+    return buildLowStockMessage();
 }
 
 QString MedicineStore::buildLowStockMessage() const
@@ -197,9 +204,10 @@ QString MedicineStore::buildLowStockMessage() const
     QStringList lines;
     for (const Medicine &medicine : m_medicines) {
         if (needsLowStockAlert(medicine)) {
-            lines.append(QString("%1: restano %2 pastiglie, magazzino esaurito")
+            lines.append(QString("%1: restano %2 pastiglie, magazzino esaurito (soglia %3)")
                              .arg(medicine.name)
-                             .arg(medicine.currentPills));
+                             .arg(medicine.currentPills)
+                             .arg(medicine.alertThreshold));
         }
     }
     return lines.join('\n');
@@ -232,5 +240,5 @@ void MedicineStore::processSingleDay()
 bool MedicineStore::needsLowStockAlert(const Medicine &medicine) const
 {
     return medicine.stockBoxes == 0
-        && medicine.currentPills <= 10;
+    && medicine.currentPills <= medicine.alertThreshold;
 }

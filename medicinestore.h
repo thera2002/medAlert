@@ -11,6 +11,7 @@ struct Medicine {
     int dailyPills = 0;
     int currentPills = 0;
     int stockBoxes = 0;
+    int alertThreshold = 10;
     bool standby = false;
     bool lowStockNotified = false;
 };
@@ -32,7 +33,8 @@ public:
     void removeMedicine(int index);
     void setInventory(int index, int currentPills, int stockBoxes);
 
-    QString processPendingDailyUpdates();
+    QString processPendingDailyUpdates(bool emitNotification = true);
+    QString lowStockSummary() const;
 
 signals:
     void dataChanged();

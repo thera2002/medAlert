@@ -5,6 +5,7 @@
 #include <QMainWindow>
 
 class QLabel;
+class QString;
 class QPushButton;
 class QTableWidget;
 class QTimer;
@@ -24,6 +25,8 @@ private slots:
     void updateInventory();
     void removeSelectedMedicine();
     void showSelectedMedicines();
+    void installUserTimer();
+    void triggerManualCheck();
     void scheduleNextDailyUpdate();
     void runDailyUpdate();
     void onLowStockAlert(const QString &message);
@@ -31,6 +34,8 @@ private slots:
 private:
     int selectedRow() const;
     bool editMedicineDialog(Medicine &medicine, bool editInventory);
+    bool installSystemdUserTimer(QString *errorMessage = nullptr) const;
+    void showNotification(const QString &title, const QString &message, bool warning);
 
     MedicineStore m_store;
     NotificationService *m_notifications = nullptr;

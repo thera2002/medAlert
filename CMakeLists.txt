@@ -23,3 +23,7 @@ qt_add_executable(medAlert
 target_link_libraries(medAlert PRIVATE Qt6::Core Qt6::Widgets Qt6::DBus)
 
 install(TARGETS medAlert RUNTIME DESTINATION bin)
+install(FILES
+    systemd/medalert.service
+    systemd/medalert.timer
+    DESTINATION share/medAlert/systemd)

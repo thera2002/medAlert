@@ -1,0 +1,8 @@
+[Unit]
+Description=medAlert daily medicine check
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=/absolute/path/to/medAlert --check

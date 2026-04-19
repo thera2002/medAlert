@@ -7,5 +7,6 @@ class NotificationService : public QObject {
 
 public:
     explicit NotificationService(QObject *parent = nullptr);
+    bool sendNotification(const QString &title, const QString &message, const QString &iconName);
     bool sendLowStockNotification(const QString &message);
 };

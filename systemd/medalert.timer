@@ -1,0 +1,10 @@
+[Unit]
+Description=Run medAlert daily at 23:00
+
+[Timer]
+OnCalendar=*-*-* 23:00:00
+Persistent=true
+Unit=medalert.service
+
+[Install]
+WantedBy=timers.target
