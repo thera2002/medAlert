@@ -22,7 +22,6 @@ private slots:
     void refreshTable();
     void addMedicine();
     void editSelectedMedicine();
-    void updateInventory();
     void removeSelectedMedicine();
     void showSelectedMedicines();
     void installUserTimer();
@@ -33,7 +32,7 @@ private slots:
 
 private:
     int selectedRow() const;
-    bool editMedicineDialog(Medicine &medicine, bool editInventory);
+    bool editMedicineDialog(Medicine &medicine);
     bool installSystemdUserTimer(QString *errorMessage = nullptr) const;
     void showNotification(const QString &title, const QString &message, bool warning);
 

@@ -204,7 +204,7 @@ QString MedicineStore::buildLowStockMessage() const
     QStringList lines;
     for (const Medicine &medicine : m_medicines) {
         if (needsLowStockAlert(medicine)) {
-            lines.append(QString("%1: restano %2 pastiglie, magazzino esaurito (soglia %3)")
+            lines.append(QString("%1: restano %2 unità, magazzino esaurito (soglia %3)")
                              .arg(medicine.name)
                              .arg(medicine.currentPills)
                              .arg(medicine.alertThreshold));

@@ -4,14 +4,14 @@ Applicazione desktop in C++ e Qt6 per tenere traccia delle medicine presenti in 
 
 ## Funzioni principali
 
-- scheda per ogni farmaco con nome, pastiglie per confezione e dosaggio giornaliero
-- stato corrente espresso in numero di pastiglie residue
+- scheda per ogni farmaco con nome, unità per confezione e dosaggio giornaliero
+- stato corrente espresso in numero di unità residue
 - scorta di magazzino espressa in numero di confezioni
 - possibilità di mettere un farmaco in stand-by, sospendendo il consumo automatico delle 23:00
 - aggiornamento automatico una volta al giorno alle 23:00
-- ricarico automatico dallo stock quando le pastiglie correnti terminano
-- soglia di notifica configurabile per ogni farmaco, con default a 10 pastiglie
-- notifica quando le pastiglie residue scendono sotto la soglia configurata e non ci sono confezioni di riserva
+- ricarico automatico dallo stock quando le unità correnti terminano
+- soglia di notifica configurabile per ogni farmaco, con default a 10 unità
+- notifica quando le unità residue scendono sotto la soglia configurata e non ci sono confezioni di riserva
 - selezione multipla di righe con i meccanismi standard della tabella Qt, incluso Shift+clic
 - pulsante che mostra in una finestra modale i nomi dei farmaci selezionati, uno per riga
 - il controllo manuale invia sempre una notifica, anche quando non c'è nulla da ordinare, per testare il sistema

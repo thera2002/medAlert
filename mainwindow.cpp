@@ -110,7 +110,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     auto *addButton = new QPushButton(QStringLiteral("Aggiungi farmaco"), this);
     auto *editButton = new QPushButton(QStringLiteral("Modifica scheda"), this);
-    auto *inventoryButton = new QPushButton(QStringLiteral("Aggiorna scorte"), this);
     auto *removeButton = new QPushButton(QStringLiteral("Rimuovi"), this);
     auto *selectedNamesButton = new QPushButton(QStringLiteral("Mostra selezionati"), this);
     auto *installTimerButton = new QPushButton(QStringLiteral("Attiva timer 23:00"), this);
@@ -119,8 +118,8 @@ MainWindow::MainWindow(QWidget *parent)
     m_table->setColumnCount(7);
     m_table->setHorizontalHeaderLabels({
         QStringLiteral("Farmaco"),
-        QStringLiteral("Pastiglie/conf."),
-        QStringLiteral("Assunzione/die"),
+        QStringLiteral("Unità/conf."),
+        QStringLiteral("Unità/die"),
         QStringLiteral("Stato corr."),
         QStringLiteral("Scorta conf."),
         QStringLiteral("Soglia notif."),
@@ -128,14 +127,13 @@ MainWindow::MainWindow(QWidget *parent)
     });
     m_table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Interactive);
-    m_table->setColumnWidth(0, 260);
+    m_table->setColumnWidth(0, 280);
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
     buttonLayout->addWidget(addButton);
     buttonLayout->addWidget(editButton);
-    buttonLayout->addWidget(inventoryButton);
     buttonLayout->addWidget(removeButton);
     buttonLayout->addWidget(selectedNamesButton);
     buttonLayout->addWidget(installTimerButton);
@@ -157,7 +155,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(addButton, &QPushButton::clicked, this, &MainWindow::addMedicine);
     connect(editButton, &QPushButton::clicked, this, &MainWindow::editSelectedMedicine);
-    connect(inventoryButton, &QPushButton::clicked, this, &MainWindow::updateInventory);
     connect(removeButton, &QPushButton::clicked, this, &MainWindow::removeSelectedMedicine);
     connect(selectedNamesButton, &QPushButton::clicked, this, &MainWindow::showSelectedMedicines);
     connect(installTimerButton, &QPushButton::clicked, this, &MainWindow::installUserTimer);
@@ -221,7 +218,7 @@ void MainWindow::refreshTable()
 void MainWindow::addMedicine()
 {
     Medicine medicine;
-    if (!editMedicineDialog(medicine, true)) {
+    if (!editMedicineDialog(medicine)) {
         return;
     }
     m_store.upsertMedicine(-1, medicine);
@@ -236,25 +233,10 @@ void MainWindow::editSelectedMedicine()
     }
 
     Medicine medicine = m_store.medicines().at(row);
-    if (!editMedicineDialog(medicine, true)) {
+    if (!editMedicineDialog(medicine)) {
         return;
     }
     m_store.upsertMedicine(row, medicine);
-}
-
-void MainWindow::updateInventory()
-{
-    const int row = selectedRow();
-    if (row < 0) {
-        QMessageBox::information(this, QStringLiteral("medAlert"), QStringLiteral("Seleziona un farmaco da aggiornare."));
-        return;
-    }
-
-    Medicine medicine = m_store.medicines().at(row);
-    if (!editMedicineDialog(medicine, false)) {
-        return;
-    }
-    m_store.setInventory(row, medicine.currentPills, medicine.stockBoxes);
 }
 
 void MainWindow::removeSelectedMedicine()
@@ -444,16 +426,15 @@ int MainWindow::selectedRow() const
     return rows.first().row();
 }
 
-bool MainWindow::editMedicineDialog(Medicine &medicine, bool editInventory)
+bool MainWindow::editMedicineDialog(Medicine &medicine)
 {
     QDialog dialog(this);
-    dialog.setWindowTitle(editInventory ? QStringLiteral("Scheda farmaco") : QStringLiteral("Aggiorna scorte"));
+    dialog.setWindowTitle(QStringLiteral("Scheda farmaco"));
     dialog.setMinimumWidth(440);
 
     auto *layout = new QVBoxLayout(&dialog);
     auto *formLayout = new QFormLayout();
     auto *nameEdit = new QLineEdit(medicine.name, &dialog);
-    auto *nameLabel = new QLabel(medicine.name, &dialog);
     auto *pillsPerBoxSpin = new QSpinBox(&dialog);
     auto *dailyPillsSpin = new QSpinBox(&dialog);
     auto *currentPillsSpin = new QSpinBox(&dialog);
@@ -465,15 +446,13 @@ bool MainWindow::editMedicineDialog(Medicine &medicine, bool editInventory)
     formLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     formLayout->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
     formLayout->setFormAlignment(Qt::AlignTop);
+    formLayout->setContentsMargins(0, 10, 0, 0);
 
     pillsPerBoxSpin->setRange(1, 10000);
     dailyPillsSpin->setRange(0, 1000);
     currentPillsSpin->setRange(0, 10000);
     stockBoxesSpin->setRange(0, 10000);
     alertThresholdSpin->setRange(0, 10000);
-
-    nameLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    nameLabel->setWordWrap(true);
 
     pillsPerBoxSpin->setValue(qMax(1, medicine.pillsPerBox));
     dailyPillsSpin->setValue(qMax(0, medicine.dailyPills));
@@ -482,23 +461,19 @@ bool MainWindow::editMedicineDialog(Medicine &medicine, bool editInventory)
     alertThresholdSpin->setValue(qMax(0, medicine.alertThreshold));
     standbyCheck->setChecked(medicine.standby);
 
-    if (editInventory) {
-        formLayout->addRow(QStringLiteral("Nome farmaco"), nameEdit);
-        formLayout->addRow(QStringLiteral("Pastiglie per confezione"), pillsPerBoxSpin);
-        formLayout->addRow(QStringLiteral("Pastiglie assunte al giorno"), dailyPillsSpin);
-    } else {
-        formLayout->addRow(QStringLiteral("Farmaco"), nameLabel);
-    }
-    formLayout->addRow(QStringLiteral("Stato corrente (pastiglie)"), currentPillsSpin);
+    formLayout->addRow(QStringLiteral("Nome farmaco"), nameEdit);
+    formLayout->addRow(QStringLiteral("Unità per confezione"), pillsPerBoxSpin);
+    formLayout->addRow(QStringLiteral("Unità assunte al giorno"), dailyPillsSpin);
+    formLayout->addRow(QStringLiteral("Stato corrente (unità)"), currentPillsSpin);
     formLayout->addRow(QStringLiteral("Magazzino (confezioni)"), stockBoxesSpin);
-    formLayout->addRow(QStringLiteral("Soglia notifica (pastiglie)"), alertThresholdSpin);
+    formLayout->addRow(QStringLiteral("Soglia notifica (unità)"), alertThresholdSpin);
     formLayout->addRow(QString(), standbyCheck);
 
     layout->addLayout(formLayout);
     layout->addWidget(buttons);
 
     connect(buttons, &QDialogButtonBox::accepted, &dialog, [&]() {
-        if (editInventory && nameEdit->text().trimmed().isEmpty()) {
+        if (nameEdit->text().trimmed().isEmpty()) {
             QMessageBox::warning(&dialog, QStringLiteral("medAlert"), QStringLiteral("Il nome del farmaco è obbligatorio."));
             return;
         }
@@ -510,11 +485,9 @@ bool MainWindow::editMedicineDialog(Medicine &medicine, bool editInventory)
         return false;
     }
 
-    if (editInventory) {
-        medicine.name = nameEdit->text().trimmed();
-        medicine.pillsPerBox = pillsPerBoxSpin->value();
-        medicine.dailyPills = dailyPillsSpin->value();
-    }
+    medicine.name = nameEdit->text().trimmed();
+    medicine.pillsPerBox = pillsPerBoxSpin->value();
+    medicine.dailyPills = dailyPillsSpin->value();
     medicine.currentPills = currentPillsSpin->value();
     medicine.stockBoxes = stockBoxesSpin->value();
     medicine.alertThreshold = alertThresholdSpin->value();
