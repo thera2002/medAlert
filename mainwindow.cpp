@@ -1,7 +1,10 @@
+#include "appsettings.h"
 #include "mainwindow.h"
 
+#include "apptranslator.h"
 #include "notificationservice.h"
 
+#include <QComboBox>
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDialog>
@@ -17,6 +20,7 @@
 #include <QPlainTextEdit>
 #include <QProcess>
 #include <QPushButton>
+#include <QSignalBlocker>
 #include <QCheckBox>
 #include <QSpinBox>
 #include <QStandardPaths>
@@ -24,6 +28,8 @@
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QTextStream>
+#include <QTime>
+#include <QTimeEdit>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QLineEdit>
@@ -42,28 +48,32 @@ QString serviceFileContent()
 {
     return QStringLiteral(
         "[Unit]\n"
-        "Description=medAlert daily medicine check\n"
+        "Description=%1\n"
         "After=graphical-session.target\n"
         "PartOf=graphical-session.target\n"
         "\n"
         "[Service]\n"
         "Type=oneshot\n"
-        "ExecStart=%1 --check\n").arg(quotedSystemdExec(QCoreApplication::applicationFilePath()));
+        "ExecStart=%2 --check\n")
+        .arg(MainWindow::tr("medAlert daily medication check"))
+        .arg(quotedSystemdExec(QCoreApplication::applicationFilePath()));
 }
 
-QString timerFileContent()
+    QString timerFileContent(const QTime &updateTime)
 {
     return QStringLiteral(
         "[Unit]\n"
-        "Description=Run medAlert daily at 23:00\n"
+        "Description=%1\n"
         "\n"
         "[Timer]\n"
-        "OnCalendar=*-*-* 23:00:00\n"
+        "OnCalendar=*-*-* %2:00\n"
         "Persistent=true\n"
         "Unit=medalert.service\n"
         "\n"
         "[Install]\n"
-        "WantedBy=timers.target\n");
+        "WantedBy=timers.target\n")
+        .arg(MainWindow::tr("Run medAlert daily at %1").arg(updateTime.toString(QStringLiteral("HH:mm"))))
+        .arg(updateTime.toString(QStringLiteral("HH:mm")));
 }
 
 bool runUserSystemctl(const QStringList &arguments, QString *errorMessage)
@@ -72,7 +82,7 @@ bool runUserSystemctl(const QStringList &arguments, QString *errorMessage)
     process.start(QStringLiteral("systemctl"), QStringList{QStringLiteral("--user")} + arguments);
     if (!process.waitForFinished()) {
         if (errorMessage != nullptr) {
-            *errorMessage = QStringLiteral("systemctl --user non ha completato l'operazione.");
+            *errorMessage = MainWindow::tr("The systemctl --user command did not complete.");
         }
         return false;
     }
@@ -96,6 +106,16 @@ MainWindow::MainWindow(QWidget *parent)
     , m_notifications(new NotificationService(this))
     , m_table(new QTableWidget(this))
     , m_statusLabel(new QLabel(this))
+    , m_addButton(new QPushButton(this))
+    , m_moveUpButton(new QPushButton(QStringLiteral(""), this))
+    , m_moveDownButton(new QPushButton(QStringLiteral(""), this))
+    , m_editButton(new QPushButton(this))
+    , m_removeButton(new QPushButton(this))
+    , m_selectedNamesButton(new QPushButton(this))
+    , m_settingsButton(new QPushButton(this))
+    , m_installTimerButton(new QPushButton(this))
+    , m_runNowButton(new QPushButton(this))
+    , m_updateTime(new QTime(AppSettings::loadUpdateTime()))
     , m_dailyTimer(new QTimer(this))
 {
     setWindowTitle(QStringLiteral("medAlert"));
@@ -109,28 +129,10 @@ MainWindow::MainWindow(QWidget *parent)
     mainLayout->setContentsMargins(14, 14, 14, 14);
     mainLayout->setSpacing(10);
 
-    auto *addButton = new QPushButton(QStringLiteral("Aggiungi farmaco"), this);
-    auto *moveUpButton = new QPushButton(QStringLiteral(""), this);
-    auto *moveDownButton = new QPushButton(QStringLiteral(""), this);
-    auto *editButton = new QPushButton(QStringLiteral("Modifica scheda"), this);
-    auto *removeButton = new QPushButton(QStringLiteral("Rimuovi"), this);
-    auto *selectedNamesButton = new QPushButton(QStringLiteral("Mostra selezionati"), this);
-    auto *installTimerButton = new QPushButton(QStringLiteral("Attiva timer 23:00"), this);
-    auto *runNowButton = new QPushButton(QStringLiteral("Esegui controllo ora"), this);
-
-    moveUpButton->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
-    moveDownButton->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
+    m_moveUpButton->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
+    m_moveDownButton->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
 
     m_table->setColumnCount(7);
-    m_table->setHorizontalHeaderLabels({
-        QStringLiteral("Farmaco"),
-        QStringLiteral("Unità/conf."),
-        QStringLiteral("Unità/die"),
-        QStringLiteral("Stato corr."),
-        QStringLiteral("Scorta conf."),
-        QStringLiteral("Soglia notif."),
-        QStringLiteral("Stand-by")
-    });
     m_table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Interactive);
     m_table->setColumnWidth(0, 280);
@@ -138,15 +140,16 @@ MainWindow::MainWindow(QWidget *parent)
     m_table->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
-    buttonLayout->addWidget(addButton);
-    buttonLayout->addWidget(moveUpButton);
-    buttonLayout->addWidget(moveDownButton);
-    buttonLayout->addWidget(editButton);
-    buttonLayout->addWidget(removeButton);
-    buttonLayout->addWidget(selectedNamesButton);
-    buttonLayout->addWidget(installTimerButton);
+    buttonLayout->addWidget(m_addButton);
+    buttonLayout->addWidget(m_moveUpButton);
+    buttonLayout->addWidget(m_moveDownButton);
+    buttonLayout->addWidget(m_editButton);
+    buttonLayout->addWidget(m_removeButton);
+    buttonLayout->addWidget(m_selectedNamesButton);
+    buttonLayout->addWidget(m_settingsButton);
+    buttonLayout->addWidget(m_installTimerButton);
     buttonLayout->addStretch();
-    buttonLayout->addWidget(runNowButton);
+    buttonLayout->addWidget(m_runNowButton);
 
     mainLayout->addLayout(buttonLayout);
     mainLayout->addWidget(m_table);
@@ -161,14 +164,17 @@ MainWindow::MainWindow(QWidget *parent)
         "}"
     ));
 
-    connect(addButton, &QPushButton::clicked, this, &MainWindow::addMedicine);
-    connect(moveUpButton, &QPushButton::clicked, this, &MainWindow::moveSelectedMedicineUp);
-    connect(moveDownButton, &QPushButton::clicked, this, &MainWindow::moveSelectedMedicineDown);
-    connect(editButton, &QPushButton::clicked, this, &MainWindow::editSelectedMedicine);
-    connect(removeButton, &QPushButton::clicked, this, &MainWindow::removeSelectedMedicine);
-    connect(selectedNamesButton, &QPushButton::clicked, this, &MainWindow::showSelectedMedicines);
-    connect(installTimerButton, &QPushButton::clicked, this, &MainWindow::installUserTimer);
-    connect(runNowButton, &QPushButton::clicked, this, &MainWindow::triggerManualCheck);
+    retranslateUi();
+
+    connect(m_addButton, &QPushButton::clicked, this, &MainWindow::addMedicine);
+    connect(m_moveUpButton, &QPushButton::clicked, this, &MainWindow::moveSelectedMedicineUp);
+    connect(m_moveDownButton, &QPushButton::clicked, this, &MainWindow::moveSelectedMedicineDown);
+    connect(m_editButton, &QPushButton::clicked, this, &MainWindow::editSelectedMedicine);
+    connect(m_removeButton, &QPushButton::clicked, this, &MainWindow::removeSelectedMedicine);
+    connect(m_selectedNamesButton, &QPushButton::clicked, this, &MainWindow::showSelectedMedicines);
+    connect(m_settingsButton, &QPushButton::clicked, this, &MainWindow::showSettingsDialog);
+    connect(m_installTimerButton, &QPushButton::clicked, this, &MainWindow::installUserTimer);
+    connect(m_runNowButton, &QPushButton::clicked, this, &MainWindow::triggerManualCheck);
     connect(&m_store, &MedicineStore::dataChanged, this, &MainWindow::refreshTable);
     connect(&m_store, &MedicineStore::lowStockAlert, this, &MainWindow::onLowStockAlert);
     connect(m_dailyTimer, &QTimer::timeout, this, &MainWindow::runDailyUpdate);
@@ -176,11 +182,57 @@ MainWindow::MainWindow(QWidget *parent)
     if (!m_store.load()) {
         QMessageBox::warning(this,
                              QStringLiteral("medAlert"),
-                             QStringLiteral("Impossibile caricare il file JSON di stato. Verrà creato al primo salvataggio."));
+                             tr("Unable to load the JSON state file. It will be created on first save."));
     }
 
     refreshTable();
     runDailyUpdate();
+}
+
+void MainWindow::changeEvent(QEvent *event)
+{
+    if (event->type() == QEvent::LanguageChange) {
+        retranslateUi();
+    }
+
+    QMainWindow::changeEvent(event);
+}
+
+void MainWindow::retranslateUi()
+{
+    m_addButton->setText(tr("Add medication"));
+    m_editButton->setText(tr("Edit entry"));
+    m_removeButton->setText(tr("Remove"));
+    m_selectedNamesButton->setText(tr("Show selected"));
+    m_settingsButton->setText(tr("Settings"));
+    m_installTimerButton->setText(tr("Enable daily timer"));
+    m_runNowButton->setText(tr("Run check now"));
+    m_moveUpButton->setToolTip(tr("Move up"));
+    m_moveDownButton->setToolTip(tr("Move down"));
+    m_table->setHorizontalHeaderLabels({
+        tr("Medication"),
+        tr("Units/box"),
+        tr("Units/day"),
+        tr("Current units"),
+        tr("Stock boxes"),
+        tr("Alert threshold"),
+        tr("Standby")
+    });
+    refreshTable();
+}
+
+QString MainWindow::languageDisplayName(const QString &languageCode) const
+{
+    if (languageCode == QStringLiteral("it")) {
+        return tr("Italian");
+    }
+    if (languageCode == QStringLiteral("fr")) {
+        return tr("French");
+    }
+    if (languageCode == QStringLiteral("de")) {
+        return tr("German");
+    }
+    return tr("English");
 }
 
 void MainWindow::refreshTable()
@@ -200,7 +252,7 @@ void MainWindow::refreshTable()
         auto *currentPillsItem = new QTableWidgetItem(QString::number(medicine.currentPills));
         auto *stockBoxesItem = new QTableWidgetItem(QString::number(medicine.stockBoxes));
         auto *alertThresholdItem = new QTableWidgetItem(QString::number(medicine.alertThreshold));
-        auto *standbyItem = new QTableWidgetItem(medicine.standby ? QStringLiteral("Sì") : QStringLiteral("No"));
+        auto *standbyItem = new QTableWidgetItem(medicine.standby ? tr("Yes") : tr("No"));
 
         if (isBelowThreshold) {
             nameItem->setBackground(lowStockRowColor);
@@ -221,7 +273,7 @@ void MainWindow::refreshTable()
         m_table->setItem(row, 6, standbyItem);
     }
 
-    m_statusLabel->setText(QStringLiteral("Archivio JSON: %1").arg(m_store.storagePath()));
+    m_statusLabel->setText(tr("JSON file: %1").arg(m_store.storagePath()));
     scheduleNextDailyUpdate();
 }
 
@@ -250,7 +302,7 @@ void MainWindow::moveSelectedMedicine(int offset)
     if (row < 0) {
         QMessageBox::information(this,
                                  QStringLiteral("medAlert"),
-                                 QStringLiteral("Seleziona un farmaco da spostare."));
+                                 tr("Select a medication to move."));
         return;
     }
 
@@ -270,7 +322,7 @@ void MainWindow::editSelectedMedicine()
 {
     const int row = selectedRow();
     if (row < 0) {
-        QMessageBox::information(this, QStringLiteral("medAlert"), QStringLiteral("Seleziona un farmaco da modificare."));
+        QMessageBox::information(this, QStringLiteral("medAlert"), tr("Select a medication to edit."));
         return;
     }
 
@@ -291,10 +343,10 @@ void MainWindow::removeSelectedMedicine()
     const QString medicineName = m_store.medicines().at(row).name;
     QMessageBox confirmationBox(this);
     confirmationBox.setIcon(QMessageBox::Warning);
-    confirmationBox.setWindowTitle(QStringLiteral("Conferma rimozione"));
-    confirmationBox.setText(QStringLiteral("Vuoi davvero rimuovere questo farmaco?"));
+    confirmationBox.setWindowTitle(tr("Confirm removal"));
+    confirmationBox.setText(tr("Do you really want to remove this medication?"));
     confirmationBox.setInformativeText(
-        QStringLiteral("Il farmaco \"%1\" verrà eliminato dall'archivio.").arg(medicineName));
+        tr("The medication \"%1\" will be removed from the archive.").arg(medicineName));
     confirmationBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
     confirmationBox.setDefaultButton(QMessageBox::No);
 
@@ -308,8 +360,8 @@ void MainWindow::showSelectedMedicines()
     const QModelIndexList rows = m_table->selectionModel()->selectedRows();
     if (rows.isEmpty()) {
         QMessageBox::information(this,
-                                 QStringLiteral("Farmaci selezionati"),
-                                 QStringLiteral("Seleziona uno o più farmaci dalla tabella."));
+                                 tr("Selected medications"),
+                                 tr("Select one or more medications from the table."));
         return;
     }
 
@@ -320,7 +372,7 @@ void MainWindow::showSelectedMedicines()
     }
 
     QDialog dialog(this);
-    dialog.setWindowTitle(QStringLiteral("Farmaci selezionati"));
+    dialog.setWindowTitle(tr("Selected medications"));
     dialog.setModal(true);
     dialog.resize(480, 360);
 
@@ -344,14 +396,65 @@ void MainWindow::installUserTimer()
     QString errorMessage;
     if (!installSystemdUserTimer(&errorMessage)) {
         QMessageBox::warning(this,
-                             QStringLiteral("Attivazione timer"),
+                             tr("Timer activation"),
                              errorMessage);
         return;
     }
 
     QMessageBox::information(this,
-                             QStringLiteral("Attivazione timer"),
-                             QStringLiteral("Il timer utente medalert.timer è stato installato e abilitato alle 23:00."));
+                             tr("Timer activation"),
+                             tr("The medalert.timer user timer has been installed and enabled for %1.")
+                                 .arg(m_updateTime->toString(QStringLiteral("HH:mm"))));
+}
+
+void MainWindow::showSettingsDialog()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Application settings"));
+    dialog.setMinimumWidth(360);
+
+    auto *layout = new QVBoxLayout(&dialog);
+    auto *formLayout = new QFormLayout();
+    auto *languageCombo = new QComboBox(&dialog);
+    auto *timeEdit = new QTimeEdit(*m_updateTime, &dialog);
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    auto *infoLabel = new QLabel(tr("The application must be restarted to update every visible label after a language change."), &dialog);
+
+    languageCombo->addItem(tr("English"), QStringLiteral("en"));
+    languageCombo->addItem(tr("Italian"), QStringLiteral("it"));
+    languageCombo->addItem(tr("French"), QStringLiteral("fr"));
+    languageCombo->addItem(tr("German"), QStringLiteral("de"));
+    languageCombo->setCurrentIndex(languageCombo->findData(currentAppLanguageCode()));
+
+    timeEdit->setDisplayFormat(QStringLiteral("HH:mm"));
+    timeEdit->setTime(*m_updateTime);
+    infoLabel->setWordWrap(true);
+
+    formLayout->addRow(tr("Language"), languageCombo);
+    formLayout->addRow(tr("Update time"), timeEdit);
+    layout->addLayout(formLayout);
+    layout->addWidget(infoLabel);
+    layout->addWidget(buttons);
+
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
+
+    const QString languageCode = languageCombo->currentData().toString();
+    const QTime selectedTime = timeEdit->time();
+    if (!AppSettings::savePreferences(languageCode, selectedTime)) {
+        QMessageBox::warning(this,
+                             QStringLiteral("medAlert"),
+                             tr("Unable to save application settings."));
+        return;
+    }
+
+    *m_updateTime = selectedTime;
+    applyApplicationLanguage(*qApp, languageCode);
+    scheduleNextDailyUpdate();
 }
 
 void MainWindow::triggerManualCheck()
@@ -360,11 +463,11 @@ void MainWindow::triggerManualCheck()
 
     const QString message = m_store.lowStockSummary();
     if (message.isEmpty()) {
-        showNotification(QStringLiteral("Controllo completato"),
-                         QStringLiteral("Non c'è nulla da ordinare."),
+        showNotification(tr("Check complete"),
+                         tr("Nothing needs to be ordered."),
                          false);
     } else {
-        showNotification(QStringLiteral("Scorte medicine in esaurimento"),
+        showNotification(tr("Low medication stock"),
                          message,
                          true);
     }
@@ -375,7 +478,7 @@ void MainWindow::triggerManualCheck()
 void MainWindow::scheduleNextDailyUpdate()
 {
     const QDateTime now = QDateTime::currentDateTime();
-    QDateTime nextRun(QDate::currentDate(), QTime(23, 0));
+    QDateTime nextRun(QDate::currentDate(), *m_updateTime);
     if (now >= nextRun) {
         nextRun = nextRun.addDays(1);
     }
@@ -392,7 +495,7 @@ void MainWindow::runDailyUpdate()
 
 void MainWindow::onLowStockAlert(const QString &message)
 {
-    showNotification(QStringLiteral("Scorte medicine in esaurimento"), message, true);
+    showNotification(tr("Low medication stock"), message, true);
 }
 
 void MainWindow::showNotification(const QString &title, const QString &message, bool warning)
@@ -416,7 +519,7 @@ bool MainWindow::installSystemdUserTimer(QString *errorMessage) const
     const QString configRoot = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation);
     if (configRoot.isEmpty()) {
         if (errorMessage != nullptr) {
-            *errorMessage = QStringLiteral("Impossibile determinare la directory di configurazione utente.");
+            *errorMessage = tr("Unable to determine the user configuration directory.");
         }
         return false;
     }
@@ -424,7 +527,7 @@ bool MainWindow::installSystemdUserTimer(QString *errorMessage) const
     const QString systemdDir = configRoot + QStringLiteral("/systemd/user");
     if (!QDir().mkpath(systemdDir)) {
         if (errorMessage != nullptr) {
-            *errorMessage = QStringLiteral("Impossibile creare la directory %1.").arg(systemdDir);
+            *errorMessage = tr("Unable to create directory %1.").arg(systemdDir);
         }
         return false;
     }
@@ -432,7 +535,7 @@ bool MainWindow::installSystemdUserTimer(QString *errorMessage) const
     QFile serviceFile(systemdDir + QStringLiteral("/medalert.service"));
     if (!serviceFile.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
         if (errorMessage != nullptr) {
-            *errorMessage = QStringLiteral("Impossibile scrivere il file service utente.");
+            *errorMessage = tr("Unable to write the user service file.");
         }
         return false;
     }
@@ -442,11 +545,11 @@ bool MainWindow::installSystemdUserTimer(QString *errorMessage) const
     QFile timerFile(systemdDir + QStringLiteral("/medalert.timer"));
     if (!timerFile.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
         if (errorMessage != nullptr) {
-            *errorMessage = QStringLiteral("Impossibile scrivere il file timer utente.");
+            *errorMessage = tr("Unable to write the user timer file.");
         }
         return false;
     }
-    QTextStream(&timerFile) << timerFileContent();
+    QTextStream(&timerFile) << timerFileContent(*m_updateTime);
     timerFile.close();
 
     if (!runUserSystemctl({QStringLiteral("daemon-reload")}, errorMessage)) {
@@ -471,7 +574,7 @@ int MainWindow::selectedRow() const
 bool MainWindow::editMedicineDialog(Medicine &medicine)
 {
     QDialog dialog(this);
-    dialog.setWindowTitle(QStringLiteral("Scheda farmaco"));
+    dialog.setWindowTitle(tr("Medication entry"));
     dialog.setMinimumWidth(440);
 
     auto *layout = new QVBoxLayout(&dialog);
@@ -482,7 +585,7 @@ bool MainWindow::editMedicineDialog(Medicine &medicine)
     auto *currentPillsSpin = new QSpinBox(&dialog);
     auto *stockBoxesSpin = new QSpinBox(&dialog);
     auto *alertThresholdSpin = new QSpinBox(&dialog);
-    auto *standbyCheck = new QCheckBox(QStringLiteral("Farmaco in stand-by"), &dialog);
+    auto *standbyCheck = new QCheckBox(tr("Medication on standby"), &dialog);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
 
     formLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
@@ -503,12 +606,12 @@ bool MainWindow::editMedicineDialog(Medicine &medicine)
     alertThresholdSpin->setValue(qMax(0, medicine.alertThreshold));
     standbyCheck->setChecked(medicine.standby);
 
-    formLayout->addRow(QStringLiteral("Nome farmaco"), nameEdit);
-    formLayout->addRow(QStringLiteral("Unità per confezione"), pillsPerBoxSpin);
-    formLayout->addRow(QStringLiteral("Unità assunte al giorno"), dailyPillsSpin);
-    formLayout->addRow(QStringLiteral("Stato corrente (unità)"), currentPillsSpin);
-    formLayout->addRow(QStringLiteral("Magazzino (confezioni)"), stockBoxesSpin);
-    formLayout->addRow(QStringLiteral("Soglia notifica (unità)"), alertThresholdSpin);
+    formLayout->addRow(tr("Medication name"), nameEdit);
+    formLayout->addRow(tr("Units per box"), pillsPerBoxSpin);
+    formLayout->addRow(tr("Units taken per day"), dailyPillsSpin);
+    formLayout->addRow(tr("Current state (units)"), currentPillsSpin);
+    formLayout->addRow(tr("Stock (boxes)"), stockBoxesSpin);
+    formLayout->addRow(tr("Notification threshold (units)"), alertThresholdSpin);
     formLayout->addRow(QString(), standbyCheck);
 
     layout->addLayout(formLayout);
@@ -516,7 +619,7 @@ bool MainWindow::editMedicineDialog(Medicine &medicine)
 
     connect(buttons, &QDialogButtonBox::accepted, &dialog, [&]() {
         if (nameEdit->text().trimmed().isEmpty()) {
-            QMessageBox::warning(&dialog, QStringLiteral("medAlert"), QStringLiteral("Il nome del farmaco è obbligatorio."));
+            QMessageBox::warning(&dialog, QStringLiteral("medAlert"), tr("Medication name is required."));
             return;
         }
         dialog.accept();

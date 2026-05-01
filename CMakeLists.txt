@@ -11,6 +11,10 @@ set(CMAKE_AUTOUIC ON)
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets DBus)
 
 qt_add_executable(medAlert
+    apptranslator.cpp
+    apptranslator.h
+    appsettings.cpp
+    appsettings.h
     main.cpp
     mainwindow.cpp
     mainwindow.h

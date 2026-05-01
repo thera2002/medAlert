@@ -42,7 +42,7 @@ bool NotificationService::sendNotification(const QString &title, const QString &
 
 bool NotificationService::sendLowStockNotification(const QString &message)
 {
-    return sendNotification(QStringLiteral("Scorte medicine in esaurimento"),
+    return sendNotification(tr("Low medication stock"),
                             message,
                             QStringLiteral("dialog-warning"));
 }

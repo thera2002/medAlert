@@ -1,43 +1,76 @@
 # medAlert
 
-Applicazione desktop in C++ e Qt6 per tenere traccia delle medicine presenti in casa, aggiornare giornalmente le scorte e avvisare quando un farmaco sta finendo.
+C++ and Qt6 desktop application for tracking medications at home, updating stock once per day, and warning when a medication is running low.
 
-## Funzioni principali
+Available documentation:
 
-- scheda per ogni farmaco con nome, unità per confezione e dosaggio giornaliero
-- stato corrente espresso in numero di unità residue
-- scorta di magazzino espressa in numero di confezioni
-- possibilità di mettere un farmaco in stand-by, sospendendo il consumo automatico delle 23:00
-- aggiornamento automatico una volta al giorno alle 23:00
-- ricarico automatico dallo stock quando le unità correnti terminano
-- soglia di notifica configurabile per ogni farmaco, con default a 10 unità
-- notifica quando le unità residue scendono sotto la soglia configurata e non ci sono confezioni di riserva
-- selezione multipla di righe con i meccanismi standard della tabella Qt, incluso Shift+clic
-- pulsante che mostra in una finestra modale i nomi dei farmaci selezionati, uno per riga
-- il controllo manuale invia sempre una notifica, anche quando non c'è nulla da ordinare, per testare il sistema
-- modalità headless `--check` per eseguire il controllo giornaliero senza aprire la GUI
-- pulsante GUI per installare e abilitare automaticamente un timer `systemd --user` alle 23:00
-- persistenza completa su file JSON aggiornato dall'app dopo ogni modifica
+- English: `README.md`
+- Italian: `README-it.md`
+- French: `README-fr.md`
+- German: `README-de.md`
 
-## Notifiche su GNOME 3 e Wayland
+## Main features
 
-La soluzione più universale su Linux desktop è usare l'interfaccia D-Bus `org.freedesktop.Notifications`.
-Qt6 la usa facilmente tramite il modulo `Qt6::DBus` e funziona bene su GNOME 3, anche in sessioni Wayland.
+- one record per medication with name, units per box, and daily dosage
+- current state stored as remaining units
+- warehouse stock stored as number of spare boxes
+- standby mode for a medication, suspending the automatic 23:00 consumption update
+- automatic daily update at 23:00
+- automatic refill from stock when current units run out
+- configurable alert threshold for each medication, with a default of 10 units
+- notification when remaining units fall below the configured threshold and no spare boxes are left
+- multi-row selection through standard Qt table behavior, including Shift+click
+- arrow buttons to move the selected row up or down by one position
+- button that shows the selected medication names in a modal window, one per line
+- `Settings` button that opens a dialog for choosing the UI language and the daily update time
+- manual check always sends a notification, even when nothing needs to be ordered, so the notification path can be tested
+- headless `--check` mode to run the daily check without opening the GUI
+- GUI button that installs and enables a `systemd --user` timer for the configured update time
+- full persistence on a JSON file updated after every change
+- English source UI with runtime localization for Italian, French, and German based on the system locale
 
-Se il servizio di notifiche non è disponibile, l'app usa un fallback locale con finestra di avviso Qt.
+## Notifications on GNOME 3 and Wayland
 
-## File di stato JSON
+The most universal solution on Linux desktop is the `org.freedesktop.Notifications` D-Bus interface.
+Qt6 integrates with it through the `Qt6::DBus` module and it works well on GNOME 3, including Wayland sessions.
 
-Il file JSON viene salvato sotto `QStandardPaths::GenericDataLocation`, ad esempio:
+If the notification service is unavailable, the app falls back to a local Qt warning dialog.
+
+## JSON state file
+
+The JSON file is stored under `QStandardPaths::GenericDataLocation`, for example:
 
 ```text
 ~/.local/share/medAlert/medicines.json
 ```
 
-Contiene:
+It contains:
 
-- `lastProcessedDate`: ultima data per cui è stato applicato il consumo giornaliero
-- `medicines`: elenco dei farmaci, incluso il flag `standby`, la soglia di notifica e il loro stato corrente
+- `lastProcessedDate`: last date for which daily consumption has already been applied
+- `medicines`: medication list, including the `standby` flag, the alert threshold, and current stock state
+
+The application also stores preferences in:
+
+```text
+~/.local/share/medAlert/settings.json
+```
+
+This file contains:
+
+- `preferredLanguage`: selected UI language
+- `updateTime`: daily update time in `HH:mm` format
+
+## Localization
+
+The application source language is English.
+
+At startup the app loads translations for these locales when they match the system language:
+
+- Italian
+- French
+- German
+
+If no supported translation is available, the app stays in English.
 
 ## Build
 
@@ -46,27 +79,27 @@ cmake -S . -B build
 cmake --build build -j
 ```
 
-## Avvio
+## Launch
 
 ```bash
 ./build/medAlert
 ```
 
-## Controllo headless
+## Headless check
 
 ```bash
 ./build/medAlert --check
 ```
 
-La modalità `--check` legge il file JSON, applica l'aggiornamento giornaliero e invia una notifica solo se ci sono farmaci sotto soglia.
+The `--check` mode reads the JSON file, applies the daily update, and sends a notification only when one or more medications are below threshold.
 
-## Timer systemd utente
+## User systemd timer
 
-L'app può installare automaticamente i file utente:
+The app can automatically install these user files:
 
 - `~/.config/systemd/user/medalert.service`
 - `~/.config/systemd/user/medalert.timer`
 
-Il timer esegue `medAlert --check` ogni giorno alle 23:00 con `Persistent=true`.
+The timer runs `medAlert --check` every day at the configured time with `Persistent=true`.
 
-Nel repository sono presenti anche esempi in [systemd/medalert.service](/home/lfabio/git/medAlert/systemd/medalert.service) e [systemd/medalert.timer](/home/lfabio/git/medAlert/systemd/medalert.timer).
+The repository also includes example files in [systemd/medalert.service](systemd/medalert.service) and [systemd/medalert.timer](systemd/medalert.timer).

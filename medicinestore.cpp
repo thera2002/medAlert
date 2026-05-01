@@ -1,3 +1,4 @@
+#include "appsettings.h"
 #include "medicinestore.h"
 
 #include <QCoreApplication>
@@ -14,9 +15,7 @@ namespace {
 
 QString currentStorageDirectory()
 {
-    return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
-        + "/"
-        + QCoreApplication::applicationName();
+    return AppSettings::dataDirectory();
 }
 
 QDate effectiveProcessingDate(const QDateTime &now)
@@ -211,7 +210,7 @@ QString MedicineStore::buildLowStockMessage() const
     QStringList lines;
     for (const Medicine &medicine : m_medicines) {
         if (needsLowStockAlert(medicine)) {
-            lines.append(QString("%1: restano %2 unità, magazzino esaurito (soglia %3)")
+            lines.append(tr("%1: %2 units left, stock depleted (threshold %3)")
                              .arg(medicine.name)
                              .arg(medicine.currentPills)
                              .arg(medicine.alertThreshold));

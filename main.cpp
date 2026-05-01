@@ -1,3 +1,5 @@
+#include "apptranslator.h"
+#include "appsettings.h"
 #include "mainwindow.h"
 
 #include "medicinestore.h"
@@ -31,10 +33,12 @@ int runHeadlessCheck(int argc, char *argv[])
     QCoreApplication app(argc, argv);
     QCoreApplication::setApplicationName(QStringLiteral("medAlert"));
     QCoreApplication::setOrganizationName(QStringLiteral("medAlert"));
+    applyApplicationLanguage(app, AppSettings::loadPreferredLanguage());
 
     MedicineStore store;
     if (!store.load()) {
-        qCritical("Unable to load medicines JSON state.");
+        qCritical("%s",
+                  qPrintable(QCoreApplication::translate("main", "Unable to load medicines JSON state.")));
         return 1;
     }
 
@@ -47,7 +51,8 @@ int runHeadlessCheck(int argc, char *argv[])
 
     NotificationService notifications;
     if (!notifications.sendLowStockNotification(message)) {
-        qCritical("Unable to deliver low-stock notification.");
+        qCritical("%s",
+                  qPrintable(QCoreApplication::translate("main", "Unable to deliver low-stock notification.")));
         return 2;
     }
 
@@ -67,6 +72,7 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("medAlert"));
     QApplication::setOrganizationName(QStringLiteral("medAlert"));
+    applyApplicationLanguage(app, AppSettings::loadPreferredLanguage());
 
     MainWindow window;
     window.show();
