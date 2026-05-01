@@ -28,7 +28,7 @@ Se il servizio di notifiche non è disponibile, l'app usa un fallback locale con
 
 ## File di stato JSON
 
-Il file JSON viene salvato nel percorso restituito da `QStandardPaths::AppDataLocation`, ad esempio:
+Il file JSON viene salvato sotto `QStandardPaths::GenericDataLocation`, ad esempio:
 
 ```text
 ~/.local/share/medAlert/medicines.json

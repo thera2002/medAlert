@@ -12,6 +12,13 @@
 
 namespace {
 
+QString currentStorageDirectory()
+{
+    return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
+        + "/"
+        + QCoreApplication::applicationName();
+}
+
 QDate effectiveProcessingDate(const QDateTime &now)
 {
     const QTime cutoff(23, 0);
@@ -54,7 +61,7 @@ Medicine medicineFromJson(const QJsonObject &object)
 MedicineStore::MedicineStore(QObject *parent)
     : QObject(parent)
 {
-    const QString baseDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    const QString baseDir = currentStorageDirectory();
     QDir().mkpath(baseDir);
     m_storagePath = baseDir + "/medicines.json";
 }
