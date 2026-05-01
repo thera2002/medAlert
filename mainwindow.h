@@ -21,6 +21,8 @@ public:
 private slots:
     void refreshTable();
     void addMedicine();
+    void moveSelectedMedicineUp();
+    void moveSelectedMedicineDown();
     void editSelectedMedicine();
     void removeSelectedMedicine();
     void showSelectedMedicines();
@@ -34,6 +36,7 @@ private:
     int selectedRow() const;
     bool editMedicineDialog(Medicine &medicine);
     bool installSystemdUserTimer(QString *errorMessage = nullptr) const;
+    void moveSelectedMedicine(int offset);
     void showNotification(const QString &title, const QString &message, bool warning);
 
     MedicineStore m_store;

@@ -20,6 +20,7 @@
 #include <QCheckBox>
 #include <QSpinBox>
 #include <QStandardPaths>
+#include <QStyle>
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QTextStream>
@@ -109,11 +110,16 @@ MainWindow::MainWindow(QWidget *parent)
     mainLayout->setSpacing(10);
 
     auto *addButton = new QPushButton(QStringLiteral("Aggiungi farmaco"), this);
+    auto *moveUpButton = new QPushButton(QStringLiteral(""), this);
+    auto *moveDownButton = new QPushButton(QStringLiteral(""), this);
     auto *editButton = new QPushButton(QStringLiteral("Modifica scheda"), this);
     auto *removeButton = new QPushButton(QStringLiteral("Rimuovi"), this);
     auto *selectedNamesButton = new QPushButton(QStringLiteral("Mostra selezionati"), this);
     auto *installTimerButton = new QPushButton(QStringLiteral("Attiva timer 23:00"), this);
     auto *runNowButton = new QPushButton(QStringLiteral("Esegui controllo ora"), this);
+
+    moveUpButton->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
+    moveDownButton->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
 
     m_table->setColumnCount(7);
     m_table->setHorizontalHeaderLabels({
@@ -133,6 +139,8 @@ MainWindow::MainWindow(QWidget *parent)
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
     buttonLayout->addWidget(addButton);
+    buttonLayout->addWidget(moveUpButton);
+    buttonLayout->addWidget(moveDownButton);
     buttonLayout->addWidget(editButton);
     buttonLayout->addWidget(removeButton);
     buttonLayout->addWidget(selectedNamesButton);
@@ -154,6 +162,8 @@ MainWindow::MainWindow(QWidget *parent)
     ));
 
     connect(addButton, &QPushButton::clicked, this, &MainWindow::addMedicine);
+    connect(moveUpButton, &QPushButton::clicked, this, &MainWindow::moveSelectedMedicineUp);
+    connect(moveDownButton, &QPushButton::clicked, this, &MainWindow::moveSelectedMedicineDown);
     connect(editButton, &QPushButton::clicked, this, &MainWindow::editSelectedMedicine);
     connect(removeButton, &QPushButton::clicked, this, &MainWindow::removeSelectedMedicine);
     connect(selectedNamesButton, &QPushButton::clicked, this, &MainWindow::showSelectedMedicines);
@@ -222,6 +232,38 @@ void MainWindow::addMedicine()
         return;
     }
     m_store.upsertMedicine(-1, medicine);
+}
+
+void MainWindow::moveSelectedMedicineUp()
+{
+    moveSelectedMedicine(-1);
+}
+
+void MainWindow::moveSelectedMedicineDown()
+{
+    moveSelectedMedicine(1);
+}
+
+void MainWindow::moveSelectedMedicine(int offset)
+{
+    const int row = selectedRow();
+    if (row < 0) {
+        QMessageBox::information(this,
+                                 QStringLiteral("medAlert"),
+                                 QStringLiteral("Seleziona un farmaco da spostare."));
+        return;
+    }
+
+    const QVector<Medicine> currentMedicines = m_store.medicines();
+    const int targetRow = row + offset;
+    if (targetRow < 0 || targetRow >= currentMedicines.size()) {
+        return;
+    }
+
+    QVector<Medicine> reorderedMedicines = currentMedicines;
+    qSwap(reorderedMedicines[row], reorderedMedicines[targetRow]);
+    m_store.setMedicines(reorderedMedicines);
+    m_table->selectRow(targetRow);
 }
 
 void MainWindow::editSelectedMedicine()
